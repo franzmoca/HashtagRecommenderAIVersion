@@ -143,4 +143,44 @@ sc.setLogLevel("ERROR")//a
     f.toList.sortBy(-_._2.toInt)
   }
 
+  /**
+    * Precision@K is defined as the portion of hashtags in the top K ranked
+    * hashtags which match with the ground truth hashtags.
+    *
+    * @param result Array of generated hashtags
+    * @param groundTruth Array of annotated hashtags
+    * @return
+    */
+  def calculatePrecision(result:Array[String], groundTruth:Array[String]): Double ={
+    result.intersect(groundTruth).length / result.length
+  }
+
+  /**
+    * Recall@K is defined as the portion of hashtags in the ground truth hashtags which match with the top K ranked hashtags
+    *
+    * @param result Array of generated hashtags
+    * @param groundTruth Array of annotated hashtags
+    * @return
+    */
+  def calculateRecall(result:Array[String], groundTruth:Array[String]): Double ={
+    result.intersect(groundTruth).length / groundTruth.length
+  }
+
+
+  /**
+    * Accuracy@K is defined as 1 if at least one match between the top K ranked hashtags and the
+    * ground truth hashtags exists.
+    *
+    * @param result Array of generated hashtags
+    * @param groundTruth Array of annotated hashtags
+    * @return
+    */
+  def calculateAccuracy(result:Array[String], groundTruth:Array[String]): Int ={
+    if(result.intersect(groundTruth).length == 0){
+      1
+    }else{
+      0
+    }
+  }
+
 }
