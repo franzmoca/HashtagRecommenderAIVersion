@@ -3,7 +3,7 @@ name := "Scalable-Hashtag-Recommender-System"
 version := "0.1"
 
 scalaVersion := "2.11.12"
-libraryDependencies += "org.apache.spark" %% "spark-sql" % "2.3.1" % "provided"
+libraryDependencies += "org.apache.spark" %% "spark-sql" % "2.4.0" % "provided"
 libraryDependencies += "org.apache.spark" % "spark-mllib_2.11" % "1.6.0" % "provided"
 libraryDependencies +=   "org.rogach"   %%   "scallop"   %   "3.1.2"
 

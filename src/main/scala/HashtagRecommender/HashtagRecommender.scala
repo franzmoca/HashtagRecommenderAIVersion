@@ -38,7 +38,7 @@ sc.setLogLevel("ERROR")//a
    * @return the point representing the image
    */
   private def callPython(path: String): Point = {
-    val command = "python3 getimage.py " + path
+    val command = "python3 python/getimage.py " + path
     var result: String = ""
     val exec = command ! ProcessLogger(result += _, stderr append _)
 

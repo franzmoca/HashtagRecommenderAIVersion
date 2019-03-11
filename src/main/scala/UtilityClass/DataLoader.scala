@@ -26,7 +26,7 @@ object DataLoader {
     .getOrCreate().sparkContext
   sc.setLogLevel("ERROR")
   // optimal number of partitions to split the data in, so that parallelization is tuned
-val partitionsCount: Int = (1.75*Runtime.getRuntime.availableProcessors()*(sc.getExecutorStorageStatus.length-1)).toInt
+val partitionsCount: Int = (1.75*Runtime.getRuntime.availableProcessors()*(sc.getExecutorMemoryStatus.map(_._1).toArray.length-1)).toInt
 
 
   /**
