@@ -13,17 +13,18 @@ from io import BytesIO
 from PIL import Image
 import requests
 
-data_path = "/mnt/data/SCALABLE/HARRISON/pca/pca_130_new.csv"
-tag_path = "/mnt/data/SCALABLE/HARRISON/pca/tag_list_clean.csv"
+data_path = "./data/pca_130_new.csv"
+tag_path = "./data/tag_list_clean.csv"
 
 
 #Leggo dataset e carico dati training
 arr = pd.read_csv(data_path, sep=",", header=None, index_col=None, dtype="float16")
 arr = arr.to_numpy()
 
-points_centroids_map = pickle.load(open('points_centroids_map.pickle', 'rb'))
-centroids = pickle.load(open('centroids.pickle', 'rb'))
-assignments = pickle.load(open('assignments.pickle', 'rb'))
+pickle_path = './data/minibatch' if sys.argv[1]=='minibatch' else './data/mkcuda'
+
+points_centroids_map = pickle.load(open(pickle_path + '/points_centroids_map.pickle', 'rb'))
+centroids = pickle.load(open(pickle_path + '/centroids.pickle', 'rb'))
 
 pca_model = pickle.load(open('pca_model.pickle', 'rb'))
 scaler = pickle.load(open('scaler.pickle', 'rb'))

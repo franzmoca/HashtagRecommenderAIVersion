@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import pickle
 from matplotlib import pyplot
 from sklearn.cluster import MiniBatchKMeans
 from sklearn.decomposition import PCA
@@ -12,20 +13,16 @@ path = "./data/pca_130_new.csv"
 arr = pd.read_csv(path, sep=",", header=None, index_col=None, dtype="float16")
 arr = arr.to_numpy()
 
-ks = {}
-lastMinwss = 3420000
+k = 162
+mbk = MiniBatchKMeans(init='k-means++', n_clusters=k, batch_size=100,
+                      n_init=3, max_no_improvement=10, verbose=0, random_state=42)
+mbk.fit(arr)
 
-for k in range(21, 171):
-  mbk = MiniBatchKMeans(init='k-means++', n_clusters=k, batch_size=100,
-                      n_init=3, max_no_improvement=10, verbose=0)
-  mbk.fit(arr)
-  minwss = mbk.inertia_
-  print(minwss)
-if minwss < lastMinwss:
-    lastMinwss = minwss
-    ks['wss'] = k
-#print(ks)
-      #for (method, k) in ks:
-#print(f'For {method} k is {k}')
+#Dizionario con come chiave il centroide e come valore la lista di punti corrispondenti.
+points_centroids_map = {x: [] for x in range(0,k+1)}
+for index, item in enumerate(mbk.labels_):
+  points_centroids_map[item].append(index)
+pickle.dump(points_centroids_map, open('./data/minibatch/points_centroids_map.pickle', 'wb'))
+pickle.dump(mbk.cluster_centers_, open('./data/minibatch/centroids.pickle', 'wb'))
+print(mbk.cluster_centers_.shape)
 
-  #print(silhouette_score(arr, mbk.labels_, metric="euclidean", sample_size=None, random_state=None))
