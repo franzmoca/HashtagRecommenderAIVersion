@@ -37,7 +37,7 @@ def train(X,k = 169):
         points_centroids_map[item].append(index)
     return scaler, pca_model, centroids, points_centroids_map
 
-def getTags(sample,k,centroids, points_centroids_map, train_arr, hashtags):
+def getTags(sample,k,v,centroids, points_centroids_map, train_arr, hashtags):
     closest_centroid = np.nanargmin(get_distances(sample, centroids))
     #print("closest centroid:",closest_centroid)
     centroid_points = indexlist_to_points(points_centroids_map[closest_centroid], train_arr)
@@ -45,21 +45,22 @@ def getTags(sample,k,centroids, points_centroids_map, train_arr, hashtags):
     #print(distances)
     nearest_k_images = np.argsort(distances)[:k]
     #print(nearest_k_images)
-    nearest_samples = []
-    for s in nearest_k_images:
-        nearest_samples.append(points_centroids_map[closest_centroid][np.asscalar(s)])
+    #print(nearest_k_images)
+    #for s in nearest_k_images:
+    #    nearest_samples.append(points_centroids_map[closest_centroid][np.asscalar(s)])
 
     hash_dict = {}
-    for n in nearest_samples:
-        for h in hashtags[n]:
+    for n in nearest_k_images:
+        nearest_sample = points_centroids_map[closest_centroid][np.asscalar(n)]
+        for h in hashtags[nearest_sample]:
             if h in hash_dict:
-                hash_dict[h] = hash_dict[h] + 1
+                hash_dict[h] = hash_dict[h] + 1/distances[n]
             else:
-                hash_dict[h] = 1
+                hash_dict[h] = 1/distances[n]
 
     sorted_tags = sorted(hash_dict.items(), key=lambda kv: kv[1], reverse=True)
     #print(sorted_tags)
-    return sorted_tags
+    return sorted_tags[:v]
     #for tag in sorted_tags:
     #    print(tag[0] + " " + str(tag[1]) 
           
@@ -70,7 +71,7 @@ def compareResults(predict, groundtruth):
     accuracy = 1 if len(np.intersect1d(predict,groundtruth)) != 0 else 0
     return precision, recall, accuracy
     
-def test(X,y,k,scaler, pca_model, centroids, points_centroids_map, train_arr, hashtags):
+def test(X,y,k,v,scaler, pca_model, centroids, points_centroids_map, train_arr, hashtags):
     avg_precision = []
     avg_recall = []
     avg_accuracy = []
@@ -78,7 +79,7 @@ def test(X,y,k,scaler, pca_model, centroids, points_centroids_map, train_arr, ha
         val = val.reshape(1,-1)
         sv = scaler.transform(val)
         pcav = pca_model.transform(sv)
-        result = getTags(pcav, k, centroids, points_centroids_map, train_arr, hashtags)
+        result = getTags(pcav, k,v, centroids, points_centroids_map, train_arr, hashtags)
         precision, recall, accuracy = compareResults(result, y[index])
         #print(metrics)
         avg_precision.append(precision)
@@ -115,7 +116,7 @@ if args.train is True:
 
     scaler, pca_model, centroids, points_centroids_map = train(X_train, 162)    
     #Testing after traing:
-    avg_precision, avg_recall, avg_accuracy  = test(X_test, y_test, 15, scaler, pca_model, centroids, points_centroids_map, df)
+    avg_precision, avg_recall, avg_accuracy  = test(X_test, y_test, 15,10, scaler, pca_model, centroids, points_centroids_map, df,hashtags)
     print("Precision, recall, accuracy:", avg_precision, avg_recall, avg_accuracy)
     #TODO SAVE ALL MODEL TO DISK
 else:
@@ -126,6 +127,6 @@ else:
     centroids = pickle.load(open('./data/kmcuda/centroids.pickle', 'rb'))
     final_X = pickle.load(open('./data/kmcuda/final_X.pickle', 'rb'))
     points_centroids_map = pickle.load(open('./data/kmcuda/points_centroids_map.pickle', 'rb'))
-    avg_precision, avg_recall, avg_accuracy  = test(X_test.to_numpy() ,y_test, 15, scaler, pca_model, centroids, points_centroids_map, final_X, hashtags)
-    print("Precision, recall, accuracy:", avg_precision, avg_recall, avg_accuracy)
+    avg_precision, avg_recall, avg_accuracy  = test(X_test.to_numpy() ,y_test, 50 , 1 , scaler, pca_model, centroids, points_centroids_map, final_X, hashtags)
+    print("Precision, recall, accuracy:", avg_precision*100, avg_recall*100, avg_accuracy*100)
 
