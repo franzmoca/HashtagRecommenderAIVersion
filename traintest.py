@@ -126,6 +126,6 @@ else:
     centroids = pickle.load(open('./data/kmcuda/centroids.pickle', 'rb'))
     final_X = pickle.load(open('./data/kmcuda/final_X.pickle', 'rb'))
     points_centroids_map = pickle.load(open('./data/kmcuda/points_centroids_map.pickle', 'rb'))
-    avg_precision, avg_recall, avg_accuracy  = test(X_test.to_numpy() ,y_test, 50 , 1 , scaler, pca_model, centroids, points_centroids_map, final_X, hashtags)
+    avg_precision, avg_recall, avg_accuracy  = test(X_test.to_numpy() ,y_test, -1 , 10 , scaler, pca_model, centroids, points_centroids_map, final_X, hashtags)
     print("Precision, recall, accuracy:", avg_precision*100, avg_recall*100, avg_accuracy*100)
 

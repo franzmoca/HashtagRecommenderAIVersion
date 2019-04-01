@@ -1,0 +1,10 @@
+assignments.pickle filter=lfs diff=lfs merge=lfs -text
+centroids.pickle filter=lfs diff=lfs merge=lfs -text
+pca_model.pickle filter=lfs diff=lfs merge=lfs -text
+points_centroids_map.pickle filter=lfs diff=lfs merge=lfs -text
+scaler.pickle filter=lfs diff=lfs merge=lfs -text
+data/dataset/final_X.pickle filter=lfs diff=lfs merge=lfs -text
+data/dataset/full.pickle filter=lfs diff=lfs merge=lfs -text
+data/dataset/X_test.pickle filter=lfs diff=lfs merge=lfs -text
+data/dataset/y_test.pickle filter=lfs diff=lfs merge=lfs -text
+data/dataset/y_train.pickle filter=lfs diff=lfs merge=lfs -text
