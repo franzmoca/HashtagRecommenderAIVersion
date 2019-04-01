@@ -1,13 +1,11 @@
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot
-from libKMCUDA import kmeans_cuda
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.model_selection import train_test_split
 import csv
 import argparse
-
 import pickle
 
 def get_distances(point, points):
@@ -99,7 +97,7 @@ parser.set_defaults(train=False)
 args = parser.parse_args()
 
 hashtags = []
-with open("/mnt/data/SCALABLE/HARRISON/pca/tag_list_clean.csv", "r") as csvFile: 
+with open("./data/tag_list_clean.csv", "r") as csvFile:
     reader = csv.reader(csvFile,delimiter = " ")
     for row in reader:
         hashtags.append(np.asarray(row))
@@ -107,6 +105,7 @@ with open("/mnt/data/SCALABLE/HARRISON/pca/tag_list_clean.csv", "r") as csvFile:
 hashtags = np.asarray(hashtags)
 
 if args.train is True:
+    from libKMCUDA import kmeans_cuda
     full_csv = "../data/SCALABLE/HARRISON/pca/full.csv"
     df = pd.read_csv(full_csv, sep=",", header=None, index_col=0, dtype="float32")
     print("DATASET LOADED")
