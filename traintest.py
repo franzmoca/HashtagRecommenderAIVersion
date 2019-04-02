@@ -3,6 +3,7 @@ import numpy as np
 from matplotlib import pyplot
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.cluster import MiniBatchKMeans
 from sklearn.model_selection import train_test_split
 import csv
 import argparse
@@ -19,21 +20,61 @@ def indexlist_to_points(lst,dataset):
         points[index] = dataset[val]
     return points
 
-def train(X,k = 169):
-    scaler = MinMaxScaler(feature_range=[0, 1])
-    data_rescaled = scaler.fit_transform(X)
-    print("DATASET NORMALIZED")
+
+def train_1(X, k_pca = 130, save_result = False):
     #Fitting the PCA algorithm with our Data
-    pca_model = PCA(n_components=130).fit(data_rescaled)
+    try:
+        pca_model = pickle.load(open("./data/pca_model"+str(k_pca)+".pickle","rb"))
+        scaler = pickle.load(open('./data/scaler.pickle', 'rb'))
+        data_rescaled = scaler.transform(X)
+        print("DATASET NORMALIZED")
+        print("SCALER AND PCA MODEL LOADED")
+    except IOError:
+        print("PCA AND SCALER NOT FOUND")
+        scaler = MinMaxScaler(feature_range=[0, 1])
+        data_rescaled = scaler.fit_transform(X)
+        print("DATASET NORMALIZED")
+        pca_model = PCA(n_components=k_pca).fit(data_rescaled)
+
+
+
     pca_arr = pca_model.transform(data_rescaled)
+    print("DATASET REDUCED")
+
     pca_arr = pca_arr.astype('float32')
-    #ADD 
-    centroids, assignments = kmeans_cuda(
-    pca_arr, k, metric="L2", verbosity=1, seed=3)
-    points_centroids_map = {x: [] for x in range(0,169)}
-    for index, item in enumerate(assignments):
-        points_centroids_map[item].append(index)
-    return scaler, pca_model, centroids, points_centroids_map
+    if save_result:
+        pickle.dump(scaler,open('./data/scaler.pickle', 'wb'))
+        pickle.dump(pca_model,open('./data/pca_model'+k_pca+'.pickle', 'wb'))
+
+    return scaler, pca_model, pca_arr
+
+def train_2(X_pca, k = 169, clust = "kmcuda", save_result = True):
+    if clust == "kmcuda":
+        from libKMCUDA import kmeans_cuda
+        centroids, assignments = kmeans_cuda(pca_arr, k, metric="L2", verbosity=1, seed=3)
+        points_centroids_map = {x: [] for x in range(0,169)}
+        for index, item in enumerate(assignments):
+            points_centroids_map[item].append(index)
+    elif clust == "minibatch":
+        mbk = MiniBatchKMeans(init='k-means++', n_clusters=k, batch_size=100,n_init=3, max_no_improvement=10, verbose=0, random_state=42)
+        mbk.fit(X_pca)
+        points_centroids_map = {x: [] for x in range(0,k+1)}
+        for index, item in enumerate(mbk.labels_):
+            points_centroids_map[item].append(index)
+        
+        centroids = mbk.cluster_centers_
+    else:
+        print("UNIMPLEMENTED CLUSTERING METHOD; " + clust)
+        return
+    
+    if save_result:
+        pickle.dump(centroids, open('./data/'+clust+'/centroids'+str(k)+'.pickle', 'wb'))
+        pickle.dump(points_centroids_map, open('./data/'+clust+'/points_centroids_map'+str(k)+'.pickle', 'wb'))
+
+    return centroids, points_centroids_map
+
+
+
 
 def getTags(sample,k,v,centroids, points_centroids_map, train_arr, hashtags):
     closest_centroid = np.nanargmin(get_distances(sample, centroids))
@@ -41,7 +82,11 @@ def getTags(sample,k,v,centroids, points_centroids_map, train_arr, hashtags):
     centroid_points = indexlist_to_points(points_centroids_map[closest_centroid], train_arr)
     distances = get_distances(sample,centroid_points)
     #print(distances)
-    nearest_k_images = np.argsort(distances)[:k]
+    if k == -1:
+        nearest_k_images = np.argsort(distances)
+    else:
+        nearest_k_images = np.argsort(distances)[:k]
+
     #print(nearest_k_images)
     #print(nearest_k_images)
     #for s in nearest_k_images:
@@ -79,7 +124,6 @@ def test(X,y,k,v,scaler, pca_model, centroids, points_centroids_map, train_arr, 
         pcav = pca_model.transform(sv)
         result = getTags(pcav, k,v, centroids, points_centroids_map, train_arr, hashtags)
         precision, recall, accuracy = compareResults(result, y[index])
-        #print(metrics)
         avg_precision.append(precision)
         avg_recall.append(recall)
         avg_accuracy.append(accuracy)
@@ -90,42 +134,56 @@ def test(X,y,k,v,scaler, pca_model, centroids, points_centroids_map, train_arr, 
     return avg_precision , avg_recall , avg_accuracy
 
 
+
 parser = argparse.ArgumentParser(description='A hashtag recommender system based on k-means, mini-batch fast k-means and a deep learning feature extraction phase.')
 parser.add_argument('--train', dest='train', action='store_true', help="Computes the training using the chosen clustering algoritm, omit to just do the test phase")
 parser.add_argument('--clustering', '-c', dest='clust', choices=['minibatch','kmcuda'], default='kmcuda')
+parser.add_argument('--clusters', '-k_c', dest="k_clusters", default=162, type=int)
+parser.add_argument('--n_pca',dest='k_pca',default=130, type=int)
+parser.add_argument('--nearest_images', '-n_i', dest="n_images", default=-1, type=int)
+parser.add_argument('--top_hashtags', '-k_ht', dest="top_hashtags", default=10)
+
 parser.set_defaults(train=False)
 args = parser.parse_args()
 
-hashtags = []
-with open("./data/tag_list_clean.csv", "r") as csvFile:
-    reader = csv.reader(csvFile,delimiter = " ")
-    for row in reader:
-        hashtags.append(np.asarray(row))
+hashtags = pickle.load(open('./data/dataset/ht.pickle','rb'))
 
-hashtags = np.asarray(hashtags)
-
-if args.train is True:
-    from libKMCUDA import kmeans_cuda
-    full_csv = "../data/SCALABLE/HARRISON/pca/full.csv"
-    df = pd.read_csv(full_csv, sep=",", header=None, index_col=0, dtype="float32")
+if args.train:
+    full_csv = "./data/dataset/full.pickle"
+    df = pickle.load(open(full_csv,'rb'))
     print("DATASET LOADED")
 
-
+    
     X_train, X_test, y_train, y_test = train_test_split(df, hashtags, test_size=0.10, random_state=42)
+    print("DATASET SPLITTED")
 
-    scaler, pca_model, centroids, points_centroids_map = train(X_train, 162)    
+
+    scaler, pca_model, pca_arr = train_1(X_train.to_numpy(), k_pca=args.k_pca)
+    print("PCA APPLIED")
+
+    centroids, points_centroids_map = train_2(pca_arr,k=162, clust=args.clust)
+    print("CLUSTERING DONE")
+
+
     #Testing after traing:
-    avg_precision, avg_recall, avg_accuracy  = test(X_test, y_test, 15,10, scaler, pca_model, centroids, points_centroids_map, df,hashtags)
+    avg_precision, avg_recall, avg_accuracy  = test(X_test.to_numpy(), y_test, args.n_images , args.top_hashtags, scaler, pca_model, centroids, points_centroids_map, df,hashtags)
     print("Precision, recall, accuracy:", avg_precision, avg_recall, avg_accuracy)
     #TODO SAVE ALL MODEL TO DISK
+
 else:
+    #Load test set
     X_test = pickle.load(open('./data/dataset/X_test.pickle', 'rb'))
     y_test = pickle.load(open('./data/dataset/y_test.pickle', 'rb'))
-    scaler = pickle.load(open('./data/kmcuda/scaler.pickle', 'rb'))
-    pca_model = pickle.load(open('./data/kmcuda/pca_model.pickle', 'rb'))
-    centroids = pickle.load(open('./data/kmcuda/centroids.pickle', 'rb'))
-    final_X = pickle.load(open('./data/kmcuda/final_X.pickle', 'rb'))
-    points_centroids_map = pickle.load(open('./data/kmcuda/points_centroids_map.pickle', 'rb'))
-    avg_precision, avg_recall, avg_accuracy  = test(X_test.to_numpy() ,y_test, -1 , 10 , scaler, pca_model, centroids, points_centroids_map, final_X, hashtags)
+    final_X = pickle.load(open('./data/dataset/final_X.pickle', 'rb'))
+
+    #Load scaler and pca_model
+    scaler = pickle.load(open('./data/scaler.pickle', 'rb'))
+    pca_model = pickle.load(open('./data/pca_model'+str(args.k_pca)+'.pickle', 'rb'))
+
+    #Load clusterings
+    centroids = pickle.load(open('./data/'+str(args.clust)+'/centroids'+str(args.k_clusters)+'.pickle', 'rb'))
+    points_centroids_map = pickle.load(open('./data/'+str(args.clust)+'/points_centroids_map'+str(args.k_clusters)+'.pickle', 'rb'))
+
+    avg_precision, avg_recall, avg_accuracy  = test(X_test.to_numpy() ,y_test, args.n_images , args.top_hashtags , scaler, pca_model, centroids, points_centroids_map, final_X, hashtags)
     print("Precision, recall, accuracy:", avg_precision*100, avg_recall*100, avg_accuracy*100)
 
