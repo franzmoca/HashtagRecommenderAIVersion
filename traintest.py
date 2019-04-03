@@ -98,10 +98,13 @@ def getTags(sample,k,v,centroids, points_centroids_map, train_arr, hashtags):
           
 def compareResults(predict, groundtruth):
     #print(predict, groundtruth)
-    precision = len(np.intersect1d(predict,groundtruth)) / len(predict)
+    #Calculate presision@1 first
+    top_hp = predict[:1]
+    precision_1 = len(np.intersect1d(top_hp,groundtruth)) / len(top_hp)
+    #precision = len(np.intersect1d(predict,groundtruth)) / len(predict)
     recall = len(np.intersect1d(predict,groundtruth)) / len(groundtruth)
     accuracy = 1 if len(np.intersect1d(predict,groundtruth)) != 0 else 0
-    return precision, recall, accuracy
+    return precision_1, recall, accuracy
     
 def test(X,y,k,v,scaler, pca_model, centroids, points_centroids_map, train_arr, hashtags):
     avg_precision = []
@@ -158,7 +161,7 @@ if __name__ == "__main__":
 
         #Testing after traing:
         avg_precision, avg_recall, avg_accuracy  = test(X_test.to_numpy(), y_test, args.n_images , args.top_hashtags, scaler, pca_model, centroids, points_centroids_map, pca_arr ,y_train)
-        print("Precision, recall, accuracy:", avg_precision*100, avg_recall*100, avg_accuracy*100)
+        print(f"Precision@1: {avg_precision*100}, Recall@{args.top_hashtags}:  {avg_recall*100}, Accuracy@{args.top_hashtags}:  {avg_accuracy*100}")
 
     else:
         try:
@@ -178,6 +181,6 @@ if __name__ == "__main__":
             points_centroids_map = pickle.load(open('./data/'+str(args.clust)+'/points_centroids_map'+str(args.k_clusters)+'.pickle', 'rb'))
             print("Data Loading Complete, starting testing ... ")
             avg_precision, avg_recall, avg_accuracy  = test(X_test.to_numpy() ,y_test, args.n_images , args.top_hashtags , scaler, pca_model, centroids, points_centroids_map, final_X, final_Y)
-            print("Precision, recall, accuracy:", avg_precision*100, avg_recall*100, avg_accuracy*100)
+            print(f"Precision@1: {avg_precision*100}, Recall@{args.top_hashtags}:  {avg_recall*100}, Accuracy@{args.top_hashtags}:  {avg_accuracy*100}")
         except IOError as e:
             print("NEED TO TRAIN FIRST", e)
