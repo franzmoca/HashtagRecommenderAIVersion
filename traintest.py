@@ -26,26 +26,22 @@ def train_1(X, k_pca = 130, save_result = False):
     try:
         pca_model = pickle.load(open("./data/pca_model"+str(k_pca)+".pickle","rb"))
         scaler = pickle.load(open('./data/scaler.pickle', 'rb'))
-        data_rescaled = scaler.transform(X)
-        print("DATASET NORMALIZED")
-        print("SCALER AND PCA MODEL LOADED")
+        pca_arr = pickle.load(open('./data/dataset/finalX'+str(k_pca)+'.pickle', 'rb'))
+        print("REDUCED DATASET LOADED")
     except IOError:
         print("PCA AND SCALER NOT FOUND")
         scaler = MinMaxScaler(feature_range=[0, 1])
         data_rescaled = scaler.fit_transform(X)
         print("DATASET NORMALIZED")
         pca_model = PCA(n_components=k_pca).fit(data_rescaled)
+        pca_arr = pca_model.transform(data_rescaled)
+        print("DATASET REDUCED")
+        pickle.dump(scaler,open('./data/scaler.pickle', 'wb'))
+        pickle.dump(pca_model,open('./data/pca_model'+str(k_pca)+'.pickle', 'wb'))
+        pickle.dump(pca_arr,open('./data/dataset/finalX'+str(k_pca)+'.pickle', 'wb'))
 
-
-
-    pca_arr = pca_model.transform(data_rescaled)
-    print("DATASET REDUCED")
 
     pca_arr = pca_arr.astype('float32')
-    if save_result:
-        pickle.dump(scaler,open('./data/scaler.pickle', 'wb'))
-        pickle.dump(pca_model,open('./data/pca_model'+k_pca+'.pickle', 'wb'))
-
     return scaler, pca_model, pca_arr
 
 def train_2(X_pca, k = 169, clust = "kmcuda", save_result = True):
@@ -75,37 +71,30 @@ def train_2(X_pca, k = 169, clust = "kmcuda", save_result = True):
 
 
 
-
 def getTags(sample,k,v,centroids, points_centroids_map, train_arr, hashtags):
     closest_centroid = np.nanargmin(get_distances(sample, centroids))
     #print("closest centroid:",closest_centroid)
     centroid_points = indexlist_to_points(points_centroids_map[closest_centroid], train_arr)
     distances = get_distances(sample,centroid_points)
+    inverse_distances = np.power(distances, -1)
     #print(distances)
     if k == -1:
-        nearest_k_images = np.argsort(distances)
+        nearest_k_images = range(len(distances))
     else:
         nearest_k_images = np.argsort(distances)[:k]
 
-    #print(nearest_k_images)
-    #print(nearest_k_images)
-    #for s in nearest_k_images:
-    #    nearest_samples.append(points_centroids_map[closest_centroid][np.asscalar(s)])
-
     hash_dict = {}
     for n in nearest_k_images:
-        nearest_sample = points_centroids_map[closest_centroid][np.asscalar(n)]
+        nearest_sample = points_centroids_map[closest_centroid][n]
         for h in hashtags[nearest_sample]:
-            if h in hash_dict:
-                hash_dict[h] = hash_dict[h] + 1/distances[n]
-            else:
-                hash_dict[h] = 1/distances[n]
+            try:
+                hash_dict[h] = hash_dict[h] + inverse_distances[n]
+            except KeyError:
+                hash_dict[h] = inverse_distances[n]
 
     sorted_tags = sorted(hash_dict.items(), key=lambda kv: kv[1], reverse=True)
     #print(sorted_tags)
     return sorted_tags[:v]
-    #for tag in sorted_tags:
-    #    print(tag[0] + " " + str(tag[1]) 
           
 def compareResults(predict, groundtruth):
     #print(predict, groundtruth)
@@ -118,11 +107,13 @@ def test(X,y,k,v,scaler, pca_model, centroids, points_centroids_map, train_arr, 
     avg_precision = []
     avg_recall = []
     avg_accuracy = []
-    for index, val in enumerate(X):
+    X_norm = scaler.transform(X)
+    X_pca = pca_model.transform(X_norm)
+    for index, val in enumerate(X_pca):
         val = val.reshape(1,-1)
-        sv = scaler.transform(val)
-        pcav = pca_model.transform(sv)
-        result = getTags(pcav, k,v, centroids, points_centroids_map, train_arr, hashtags)
+        #sv = scaler.transform(val)
+        #pcav = pca_model.transform(sv)
+        result = getTags(val, k,v, centroids, points_centroids_map, train_arr, hashtags)
         precision, recall, accuracy = compareResults(result, y[index])
         avg_precision.append(precision)
         avg_recall.append(recall)
@@ -135,55 +126,58 @@ def test(X,y,k,v,scaler, pca_model, centroids, points_centroids_map, train_arr, 
 
 
 
-parser = argparse.ArgumentParser(description='A hashtag recommender system based on k-means, mini-batch fast k-means and a deep learning feature extraction phase.')
-parser.add_argument('--train', dest='train', action='store_true', help="Computes the training using the chosen clustering algoritm, omit to just do the test phase")
-parser.add_argument('--clustering', '-c', dest='clust', choices=['minibatch','kmcuda'], default='kmcuda')
-parser.add_argument('--clusters', '-k_c', dest="k_clusters", default=162, type=int)
-parser.add_argument('--n_pca',dest='k_pca',default=130, type=int)
-parser.add_argument('--nearest_images', '-n_i', dest="n_images", default=-1, type=int)
-parser.add_argument('--top_hashtags', '-k_ht', dest="top_hashtags", default=10)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='A hashtag recommender system based on k-means, mini-batch fast k-means and a deep learning feature extraction phase.')
+    parser.add_argument('--train', dest='train', action='store_true', help="Computes the training using the chosen clustering algoritm, omit to just do the test phase")
+    parser.add_argument('--clustering', '-c', dest='clust', choices=['minibatch','kmcuda'], default='kmcuda')
+    parser.add_argument('--clusters', '-k_c', dest="k_clusters", default=162, type=int)
+    parser.add_argument('--n_pca',dest='k_pca',default=130, type=int)
+    parser.add_argument('--nearest_images', '-n_i', dest="n_images", default=-1, type=int)
+    parser.add_argument('--top_hashtags', '-k_ht', dest="top_hashtags", default=10, type=int)
 
-parser.set_defaults(train=False)
-args = parser.parse_args()
-
-hashtags = pickle.load(open('./data/dataset/ht.pickle','rb'))
-
-if args.train:
-    full_csv = "./data/dataset/full.pickle"
-    df = pickle.load(open(full_csv,'rb'))
-    print("DATASET LOADED")
-
-    
-    X_train, X_test, y_train, y_test = train_test_split(df, hashtags, test_size=0.10, random_state=42)
-    print("DATASET SPLITTED")
+    parser.set_defaults(train=False)
+    args = parser.parse_args()
 
 
-    scaler, pca_model, pca_arr = train_1(X_train.to_numpy(), k_pca=args.k_pca)
-    print("PCA APPLIED")
+    if args.train:
+        df = pickle.load(open("./data/dataset/full.pickle",'rb'))
+        hashtags = pickle.load(open('./data/dataset/ht.pickle','rb'))
+        print("DATASET LOADED")
 
-    centroids, points_centroids_map = train_2(pca_arr,k=162, clust=args.clust)
-    print("CLUSTERING DONE")
+        
+        X_train, X_test, y_train, y_test = train_test_split(df, hashtags, test_size=0.10, random_state=42)
+        print("DATASET SPLITTED")
 
 
-    #Testing after traing:
-    avg_precision, avg_recall, avg_accuracy  = test(X_test.to_numpy(), y_test, args.n_images , args.top_hashtags, scaler, pca_model, centroids, points_centroids_map, df,hashtags)
-    print("Precision, recall, accuracy:", avg_precision, avg_recall, avg_accuracy)
-    #TODO SAVE ALL MODEL TO DISK
+        scaler, pca_model, pca_arr = train_1(X_train.to_numpy(), k_pca=args.k_pca)
+        print("PCA APPLIED")
 
-else:
-    #Load test set
-    X_test = pickle.load(open('./data/dataset/X_test.pickle', 'rb'))
-    y_test = pickle.load(open('./data/dataset/y_test.pickle', 'rb'))
-    final_X = pickle.load(open('./data/dataset/final_X.pickle', 'rb'))
+        centroids, points_centroids_map = train_2(pca_arr,k=args.k_clusters, clust=args.clust)
+        print("CLUSTERING DONE")
 
-    #Load scaler and pca_model
-    scaler = pickle.load(open('./data/scaler.pickle', 'rb'))
-    pca_model = pickle.load(open('./data/pca_model'+str(args.k_pca)+'.pickle', 'rb'))
 
-    #Load clusterings
-    centroids = pickle.load(open('./data/'+str(args.clust)+'/centroids'+str(args.k_clusters)+'.pickle', 'rb'))
-    points_centroids_map = pickle.load(open('./data/'+str(args.clust)+'/points_centroids_map'+str(args.k_clusters)+'.pickle', 'rb'))
+        #Testing after traing:
+        avg_precision, avg_recall, avg_accuracy  = test(X_test.to_numpy(), y_test, args.n_images , args.top_hashtags, scaler, pca_model, centroids, points_centroids_map, pca_arr ,y_train)
+        print("Precision, recall, accuracy:", avg_precision*100, avg_recall*100, avg_accuracy*100)
 
-    avg_precision, avg_recall, avg_accuracy  = test(X_test.to_numpy() ,y_test, args.n_images , args.top_hashtags , scaler, pca_model, centroids, points_centroids_map, final_X, hashtags)
-    print("Precision, recall, accuracy:", avg_precision*100, avg_recall*100, avg_accuracy*100)
+    else:
+        try:
+        #Load test set
+            X_test = pickle.load(open('./data/dataset/X_test.pickle', 'rb'))
+            y_test = pickle.load(open('./data/dataset/y_test.pickle', 'rb'))
 
+            final_X = pickle.load(open('./data/dataset/finalX'+str(args.k_pca)+'.pickle', 'rb'))
+            final_Y = pickle.load(open('./data/dataset/y_train.pickle', 'rb'))
+
+            #Load scaler and pca_model
+            scaler = pickle.load(open('./data/scaler.pickle', 'rb'))
+            pca_model = pickle.load(open('./data/pca_model'+str(args.k_pca)+'.pickle', 'rb'))
+
+            #Load clusterings
+            centroids = pickle.load(open('./data/'+str(args.clust)+'/centroids'+str(args.k_clusters)+'.pickle', 'rb'))
+            points_centroids_map = pickle.load(open('./data/'+str(args.clust)+'/points_centroids_map'+str(args.k_clusters)+'.pickle', 'rb'))
+            print("Data Loading Complete, starting testing ... ")
+            avg_precision, avg_recall, avg_accuracy  = test(X_test.to_numpy() ,y_test, args.n_images , args.top_hashtags , scaler, pca_model, centroids, points_centroids_map, final_X, final_Y)
+            print("Precision, recall, accuracy:", avg_precision*100, avg_recall*100, avg_accuracy*100)
+        except IOError as e:
+            print("NEED TO TRAIN FIRST", e)

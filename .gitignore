@@ -91,3 +91,5 @@ project/plugins/project/
 ### Scala ###
 *.class
 *.log
+
+*.lprof
